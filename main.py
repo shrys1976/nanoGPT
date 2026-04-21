@@ -3,7 +3,11 @@
 
 # In[2]:
 
-!wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
+import os
+import urllib.request
+
+if not os.path.exists('input.txt'):
+    urllib.request.urlretrieve('https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt', 'input.txt')
 
 
 # In[3]:
@@ -58,6 +62,10 @@ val_data = data[n:]
 # In[1]:
 
 torch.manual_seed(42)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+max_iters = 10000
+eval_interval = 300
+eval_iters = 200
 batch_size = 4 # number of independent sequences
 block_size = 8
 
@@ -143,11 +151,13 @@ class BigramLanguageModel(nn.Module):
         return idx   
 
 m = BigramLanguageModel(vocab_size)     
+m = m.to(device)
+model = m
 logits, loss = m(xb,yb)
 print(logits.shape)   
 print(loss)
 
-print(decode(m.generate(idx = torch.zeros((1,1), dtype = torch.long),max_new_tokens = 100)[0].tolist()))
+print(decode(m.generate(idx = torch.zeros((1,1), dtype = torch.long, device=device),max_new_tokens = 100)[0].tolist()))
 
 
 # In[3]:
@@ -159,7 +169,7 @@ for iter in range(max_iters):
 
     if iter % eval_interval == 0:
         losses = estimate_loss()
-        print(f'step {iter}: train loss {losses['train']: .4f}, val loss {losses['val']: .4f}')
+        print(f"step {iter}: train loss {losses['train']: .4f}, val loss {losses['val']: .4f}")
 
 
     xb,yb = get_batch('train')
