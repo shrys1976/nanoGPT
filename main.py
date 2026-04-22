@@ -1,12 +1,9 @@
 import os
-from turtle import forward
 import urllib.request
 
 import torch
 import torch.nn as nn
-from torch.nn import MultiheadAttention, functional as F
-
-from main import head_size
+from torch.nn import functional as F
 
 
 DATA_URL = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
@@ -14,6 +11,7 @@ DATA_PATH = "input.txt"
 
 batch_size = 32
 block_size = 8
+n_embd = 32
 max_iters = 10000
 eval_interval = 300
 eval_iters = 200
@@ -43,16 +41,37 @@ def build_tokenizer(text):
 
     return chars, encode, decode
 
+
+class Head(nn.Module):
+    def __init__(self, head_size):
+        super().__init__()
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
+
+    def forward(self, x):
+        B, T, C = x.shape
+        k = self.key(x)
+        q = self.query(x)
+        wei = q @ k.transpose(-2, -1)
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
+        wei = F.softmax(wei, dim=-1)
+        v = self.value(x)
+        out = wei @ v
+        return out
+
+
 class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
-        self.heads =nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-        self.proj
+        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+        self.proj = nn.Linear(n_embd, n_embd)
 
-    def forward(self,x):
-
-        return torch.cat([h(x) for h in self.heads], dim = -1)
-
+    def forward(self, x):
+        out = torch.cat([h(x) for h in self.heads], dim=-1)
+        out = self.proj(out)
+        return out
 
 
 class FeedForward(nn.Module):
@@ -61,8 +80,9 @@ class FeedForward(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
 
-            nn.Linear(n_embd,n_embd),
-            nn.Relu*(),
+            nn.Linear(n_embd, 4 * n_embd),
+            nn.ReLU(),
+            nn.Linear(4 * n_embd, n_embd),
         )
 
     def forward(self, x):
@@ -74,21 +94,21 @@ class Block(nn.Module):
 
     # transformer block
 
-    def __init__(self,n_embd, n_head):
+    def __init__(self, n_embd, n_head):
         # multi head attentions
         # n_head -> number of embedding dims
         # n_head -> number of attention heads
 
         super().__init__()
         head_size = n_embd // n_head
-        self.sa  =MultiheadAttention(n_head, head_size)
+        self.sa = MultiHeadAttention(n_head, head_size)
         self.ffwd = FeedForward(n_embd)
 
 
     def forward(self, x):
         # residual connection
-        x = x+self.sa(x)
-        x =x+self.ffwd(x)
+        x = x + self.sa(x)
+        x = x + self.ffwd(x)
         return x
 
 
