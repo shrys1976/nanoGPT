@@ -104,16 +104,3 @@ python3 main.py \
   --early-stop-min-delta 0.0005
 ```
 
-## Vast.ai artifact sync
-
-Run training inside `tmux`/`screen`, then sync artifacts regularly to avoid
-losing progress when instances stop.
-
-Example with `rsync`:
-
-```bash
-rsync -avh --progress runs/<run_name>/ /path/to/persistent-storage/<run_name>/
-```
-
-Before terminating an instance, do one final sync and verify both
-`latest.pt` and `best.pt` exist in persistent storage.
