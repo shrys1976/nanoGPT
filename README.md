@@ -36,13 +36,84 @@ The model predicts the next character using cross-entropy loss.
 Install dependencies, then run:
 
 ```bash
-python main.py
+python3 main.py
 ```
 
-The script downloads `input.txt` if needed, trains the model, prints train/validation loss during training, and generates sample text at the end.
+The script downloads `input.txt` if needed, trains the model, writes run
+artifacts under `runs/<run_name>/`, and generates sample text at the end.
 
 CUDA is used automatically if available:
 
 ```python
 device = "cuda" if torch.cuda.is_available() else "cpu"
 ```
+
+## Training artifacts
+
+Each run stores:
+
+- `runs/<run_name>/config.json` (full run config)
+- `runs/<run_name>/checkpoints/latest.pt` (latest checkpoint)
+- `runs/<run_name>/checkpoints/best.pt` (best validation checkpoint)
+- `runs/<run_name>/logs/train.log` (console + file logs)
+- `runs/<run_name>/metrics/metrics.csv` (structured metrics)
+- `runs/<run_name>/samples/sample_step_*.txt` (eval snapshots)
+
+## Resume training
+
+```bash
+python3 main.py --resume runs/<run_name>/checkpoints/latest.pt
+```
+
+You can override selected values while resuming (example):
+
+```bash
+python3 main.py \
+  --resume runs/<run_name>/checkpoints/latest.pt \
+  --max-iters 20000 \
+  --run-name resumed_run
+```
+
+## Generate from a checkpoint
+
+```bash
+python3 generate.py \
+  --checkpoint runs/<run_name>/checkpoints/best.pt \
+  --prompt "ROMEO:" \
+  --max-new-tokens 300
+```
+
+## Stop criteria and budget controls
+
+Useful flags:
+
+- `--early-stop-patience-evals`
+- `--early-stop-min-delta`
+- `--max-wall-time-minutes`
+- `--hourly-cost-usd`
+- `--budget-cap-usd`
+
+Example:
+
+```bash
+python3 main.py \
+  --hourly-cost-usd 0.30 \
+  --budget-cap-usd 1.50 \
+  --max-wall-time-minutes 240 \
+  --early-stop-patience-evals 20 \
+  --early-stop-min-delta 0.0005
+```
+
+## Vast.ai artifact sync
+
+Run training inside `tmux`/`screen`, then sync artifacts regularly to avoid
+losing progress when instances stop.
+
+Example with `rsync`:
+
+```bash
+rsync -avh --progress runs/<run_name>/ /path/to/persistent-storage/<run_name>/
+```
+
+Before terminating an instance, do one final sync and verify both
+`latest.pt` and `best.pt` exist in persistent storage.
